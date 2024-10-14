@@ -3,12 +3,12 @@ const webpack = require('webpack');
 const ejs = require('ejs');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const CopyPlugin = require('copy-webpack-plugin');
-const ExtensionReloader = require('webpack-extension-reloader');
+const ExtReloader = require('webpack-ext-reloader');
 const { VueLoaderPlugin } = require('vue-loader');
 const { version } = require('./package.json');
 
 const config = {
-  mode: 'production',
+  mode: 'development',
   entry: {
     background: './src/background/background.ts',
     content: './src/content/content.ts',
@@ -22,12 +22,18 @@ const config = {
   },
   resolve: {
     alias: {
-      'vue$': 'vue/dist/vue.runtime.esm.js'
+   'vue': 'vue/dist/vue.esm-bundler.js'
     },
     extensions: ['.ts', '.js', '.vue'],
   },
+  devtool: 'source-map',
   module: {
     rules: [
+      {
+        enforce: 'pre',
+        test: /\.js$/,
+        loader: 'source-map-loader',
+      },
       {
         test: /\.ts$/,
         loader: 'ts-loader',
@@ -39,12 +45,20 @@ const config = {
       },
       {
         test: /\.js$/,
-        loader: 'babel-loader',
-        exclude: [/node_modules/, "/icons/"],
+        exclude: /node_modules/,
+        use: {
+          loader: 'babel-loader',
+          options: {
+            presets: ['@babel/preset-env'],
+          },
+        },
       },
       {
         test: /\.css$/,
-        use: [MiniCssExtractPlugin.loader, 'css-loader'],
+        use: [
+          'vue-style-loader',
+          'css-loader'
+        ]
       },
       {
         test: /\.scss$/,
@@ -77,56 +91,54 @@ const config = {
   plugins: [
     new VueLoaderPlugin(),
     new MiniCssExtractPlugin({ filename: '[name].css' }),
-    new CopyPlugin([
+    new CopyPlugin({
+      patterns: [
       // { from: 'devtools.html', to: 'devtools.html', transform: transformHtml },
       { from: 'src/content/content.ts', to: 'content.js' },
       { from: 'src/background/background.ts', to: 'background.js' },
       { from: './node_modules/@qualweb/qw-page/dist/qw-page.bundle.js', to: 'qwPage.js' },
       { from: './node_modules/@qualweb/util/dist/util.bundle.js', to: 'util.js' },
       { from: './node_modules/@qualweb/act-rules/dist/act.bundle.js', to: 'act.js' },
-      // { from: './node_modules/@qualweb/best-practices/dist/bp.bundle.js', to: 'bp.js' },
+      { from: './node_modules/@qualweb/best-practices/dist/bp.bundle.js', to: 'bp.js' },
       { from: './node_modules/@qualweb/wcag-techniques/dist/wcag.bundle.js', to: 'wcag.js' },
       { from: 'src/locales/en.js', to: 'locales/en.js' },
       { from: 'src/popup/evaluate.js', to: 'popup/evaluate.js' },
-      { from: 'src/icons', to: 'icons', ignore: ['icon.xcf'] },
+      { 
+        from: 'src/icons', 
+        to: 'icons', 
+        globOptions: { 
+          ignore: ['**/icon.xcf'] 
+        } 
+      },
       { from: 'src/popup/popup.html', to: 'popup/popup.html', transform: transformHtml },
       { from: 'src/options/options.html', to: 'options/options.html', transform: transformHtml },
       {
         from: 'manifest.json',
         to: 'manifest.json',
-        transform: (content) => {
-          const jsonContent = JSON.parse(content);
-          jsonContent.version = version;
-
-          if (config.mode === 'development') {
-            jsonContent['content_security_policy'] = "script-src 'self' 'unsafe-eval'; object-src 'self'";
-          }
-
-          return JSON.stringify(jsonContent, null, 2);
-        },
-      },
-    ]),
-    new ExtensionReloader({ entries: { content: 'content', background: 'background', popup: 'popup', options: 'options' } }),
-  ],
+      }
+    ]
+  }),
+    new ExtReloader({
+      manifest: path.resolve(__dirname, "manifest.json")
+    }),  ],
 };
+new webpack.DefinePlugin({
+  '__VUE_OPTIONS_API__': JSON.stringify(true),
+  '__VUE_PROD_DEVTOOLS__': JSON.stringify(false),
+  '__VUE_PROD_HYDRATION_MISMATCH_DETAILS__': JSON.stringify(false),
+}),
 
-if (config.mode === 'production') {
+
   config.plugins.push(
     new webpack.DefinePlugin({
       'process.env': {
-        NODE_ENV: '"production"',
+        NODE_ENV: '"development"',
       },
     })
   );
-}
 
-if (process.env.HMR === 'true') {
-  config.plugins.push(
-    new ExtensionReloader({
-      manifest: path.resolve(__dirname, 'src/manifest.json'),
-    })
-  );
-}
+
+
 
 function transformHtml(content) {
   return ejs.render(content.toString(), {

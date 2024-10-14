@@ -5,7 +5,9 @@
         @focus="focus()"
         @blur="blur()"
         class="hidden"
-        v-model="value"
+        :modelValue="value" 
+        @update:modelValue="val => value = val"
+
         @change="onChange"
         :id="idValue"
         type="checkbox"

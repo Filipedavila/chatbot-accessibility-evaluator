@@ -1,11 +1,10 @@
-import Vue from 'vue'
-import Vuex from 'vuex'
+import { createStore } from 'vuex';
 
 import * as getters from './getters'
 import mutations from './mutations'
 import * as actions from './actions'
 
-Vue.use(Vuex)
+
 
 export const defaultState = {
   summary: {},
@@ -25,7 +24,7 @@ export const defaultState = {
 }
 
 
-export default new Vuex.Store({
+export default new createStore({
   state: {
     summary: {},
     chatbotSummary: {},
